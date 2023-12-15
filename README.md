@@ -39,3 +39,19 @@ func fortune(_ number: Int) -> String {
     }
 }
 ```
+
+### Known limitations
+
+The macro wraps code blocks in closures to implement bare last expressions. Which means
+that assignments to uninitialized variables won't compile (sorry definite initialization).
+
+```swift
+let opposite: Int
+let value = if condition {
+    opposite = 0 // cannot assign to value: 'opposite' is a 'let' constant
+    1
+} else {
+    opposite = 1 // cannot assign to value: 'opposite' is a 'let' constant
+    0
+}
+```

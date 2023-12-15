@@ -7,7 +7,7 @@ import XCTest
 @_spi(ExperimentalLanguageFeature) import BareLastExprsMacros
 
 let testMacros: [String: Macro.Type] = [
-    "BareLastExprs": BareLastExprs.self,
+    "BareLastExprs": BareLastExprsMacro.self,
 ]
 #endif
 
@@ -24,8 +24,10 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func add(_ lhs: Int, _ rhs: Int) -> Int {
-                let result = lhs + rhs
-                return result
+                return {
+                    let result = lhs + rhs
+                    return result
+                }()
             }
             """,
             macros: testMacros
@@ -55,17 +57,23 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
-                let result = lhs + rhs
                 return {
-                    if result > max {
-                        print("The result is greater than max")
-                        return max
-                    } else if result < min {
-                        print("The result is less than min")
-                        return min
-                    } else {
-                        return result
-                    }
+                    let result = lhs + rhs
+                    return if result > max {
+                        {
+                                print("The result is greater than max")
+                                return max
+                        }()
+                        } else if result < min {
+                        {
+                                print("The result is less than min")
+                                return min
+                        }()
+                        } else {
+                        {
+                            return result
+                        }()
+                        }
                 }()
             }
             """,
@@ -97,17 +105,23 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func fortune(_ number: Int) -> String {
-                print("Requesting fortune for \\(number)")
                 return {
-                    switch number {
+                    print("Requesting fortune for \\(number)")
+                    return switch number {
                             case 1:
-                        print("Warning: support for 1 is unstable")
-                        return "You have a long and prosperous future"
+                        {
+                                    print("Warning: support for 1 is unstable")
+                                    return "You have a long and prosperous future"
+                        }()
                             case 2:
-                        return "You must watch your back tomorrow (good luck...)"
+                        {
+                            return "You must watch your back tomorrow (good luck...)"
+                        }()
                             default:
-                        print("Warning: unknown number encountered (\\(number))")
-                        return "Unknown"
+                        {
+                                    print("Warning: unknown number encountered (\\(number))")
+                                    return "Unknown"
+                        }()
                         }
                 }()
             }
@@ -141,20 +155,26 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func fortune(_ number: Int) -> String {
-                print("Requesting fortune for \\(number)")
-                let fortune = {
-                    switch number {
-                            case 1:
-                        print("Warning: support for 1 is unstable")
-                        return "You have a long and prosperous future"
-                            case 2:
-                        return "You must watch your back tomorrow (good luck...)"
-                            default:
-                        print("Warning: unknown number encountered (\\(number))")
-                        return "Unknown"
-                        }
+                return {
+                    print("Requesting fortune for \\(number)")
+                    let fortune = switch number {
+                        case 1:
+                        {
+                                    print("Warning: support for 1 is unstable")
+                                    return "You have a long and prosperous future"
+                        }()
+                        case 2:
+                        {
+                            return "You must watch your back tomorrow (good luck...)"
+                        }()
+                        default:
+                        {
+                                    print("Warning: unknown number encountered (\\(number))")
+                                    return "Unknown"
+                        }()
+                    }
+                    return fortune
                 }()
-                return fortune
             }
             """,
             macros: testMacros
@@ -187,21 +207,27 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func fortune(_ number: Int) -> String {
-                print("Requesting fortune for \\(number)")
-                let fortune: String
-                fortune = {
-                    switch number {
-                            case 1:
-                        print("Warning: support for 1 is unstable")
-                        return "You have a long and prosperous future"
-                            case 2:
-                        return "You must watch your back tomorrow (good luck...)"
-                            default:
-                        print("Warning: unknown number encountered (\\(number))")
-                        return "Unknown"
-                        }
+                return {
+                    print("Requesting fortune for \\(number)")
+                    let fortune: String
+                    fortune = switch number {
+                        case 1:
+                        {
+                                    print("Warning: support for 1 is unstable")
+                                    return "You have a long and prosperous future"
+                        }()
+                        case 2:
+                        {
+                            return "You must watch your back tomorrow (good luck...)"
+                        }()
+                        default:
+                        {
+                                    print("Warning: unknown number encountered (\\(number))")
+                                    return "Unknown"
+                        }()
+                    }
+                    return fortune
                 }()
-                return fortune
             }
             """,
             macros: testMacros
@@ -232,19 +258,25 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
-                let result = lhs + rhs
-                let clampedResult = {
-                    if result > max {
-                        print("The result is greater than max")
-                        return max
+                return {
+                    let result = lhs + rhs
+                    let clampedResult = if result > max {
+                        {
+                                print("The result is greater than max")
+                                return max
+                        }()
                     } else if result < min {
-                        print("The result is less than min")
-                        return min
+                        {
+                                print("The result is less than min")
+                                return min
+                        }()
                     } else {
-                        return result
+                        {
+                            return result
+                        }()
                     }
+                    return clampedResult
                 }()
-                return clampedResult
             }
             """,
             macros: testMacros
@@ -276,20 +308,26 @@ final class BareLastExprsTests: XCTestCase {
             """,
             expandedSource: """
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
-                let result = lhs + rhs
-                let clampedResult: Int
-                clampedResult = {
-                    if result > max {
-                        print("The result is greater than max")
-                        return max
+                return {
+                    let result = lhs + rhs
+                    let clampedResult: Int
+                    clampedResult = if result > max {
+                        {
+                                print("The result is greater than max")
+                                return max
+                        }()
                     } else if result < min {
-                        print("The result is less than min")
-                        return min
+                        {
+                                print("The result is less than min")
+                                return min
+                        }()
                     } else {
-                        return result
+                        {
+                            return result
+                        }()
                     }
+                    return clampedResult
                 }()
-                return clampedResult
             }
             """,
             macros: testMacros
@@ -299,34 +337,30 @@ final class BareLastExprsTests: XCTestCase {
         #endif
     }
 
-    func testLastExprVoidFunction() throws {
+    func testClosureSimpleLastExpr() throws {
         #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
             @BareLastExprs
-            func greet(_ name: String) {
-                print("Greetings, \\(name)!")
-            }
-
-            @BareLastExprs
-            func greet(_ name: String) -> Void {
-                print("Greetings, \\(name)!")
-            }
-
-            @BareLastExprs
-            func greet(_ name: String) -> () {
-                print("Greetings, \\(name)!")
+            func add(_ lhs: Int, _ rhs: Int) -> Int {
+                let compute: () -> Int = {
+                    let result = lhs + rhs
+                    result
+                }
+                compute()
             }
             """,
             expandedSource: """
-            func greet(_ name: String) {
-                print("Greetings, \\(name)!")
-            }
-            func greet(_ name: String) -> Void {
-                print("Greetings, \\(name)!")
-            }
-            func greet(_ name: String) -> () {
-                print("Greetings, \\(name)!")
+            func add(_ lhs: Int, _ rhs: Int) -> Int {
+                return {
+                    let compute: () -> Int = {
+                        {
+                                let result = lhs + rhs
+                                return result
+                        }()
+                    }
+                    return compute()
+                }()
             }
             """,
             macros: testMacros

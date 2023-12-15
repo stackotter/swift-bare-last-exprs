@@ -28,7 +28,7 @@ let package = Package(
             ]
         ),
 
-        .target(name: "BareLastExprs", dependencies: ["BareLastExprsMacros"]),
+        .target(name: "BareLastExprs", dependencies: ["BareLastExprsMacros"], swiftSettings: [.enableExperimentalFeature("BodyMacros")]),
 
         .executableTarget(name: "FortuneExample", dependencies: ["BareLastExprs"]),
 
