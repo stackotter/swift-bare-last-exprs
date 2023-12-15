@@ -1,10 +1,16 @@
 ## Bare last expressions
 
-Use if/switch exprs and implicit returns without being limited to single statement expressions!
+This macro was built to try out a potential syntax for multi-statement if/switch expressions
+in Swift before [the pitch for multi-statement if/switch expressions](https://forums.swift.org/t/pitch-multi-statement-if-switch-do-expressions/68443/443)
+lands.
 
-Inspired by [the pitch for multi-statement if/switch expressions](https://forums.swift.org/t/pitch-multi-statement-if-switch-do-expressions/68443/443)
-which lists bare last expressions as a considered alternative. I created this macro so that people
-can play around with the ergonomics of bare last expressions in Swift.
+When a function is annotated with `@BareLastExprs`, the last expression in a multi-statement
+if/switch expression branch is used as the result. For fullness, the last expression in
+a function or closure body is implicitly returned. Together these allow for quite neat code in
+my opinion.
+
+The following code sample shows off a variety of complex expressions with implicit returns
+powered by the `@BareLastExprs` function body macro.
 
 ```swift
 @BareLastExprs
@@ -39,6 +45,22 @@ func fortune(_ number: Int) -> String {
     }
 }
 ```
+
+### Usage
+
+Since function body macros haven't landed yet, you'll have to download the latest toolchain
+snapshot and enable the experimental `BodyMacros` features. I've been using
+[the 2023-12-07 toolchain (macOS)](https://download.swift.org/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2023-12-07-a/swift-DEVELOPMENT-SNAPSHOT-2023-12-07-a-osx.pkg),
+but any newer toolchains should also work. I haven't tested the macro on Linux yet, let me know
+if it works!
+
+```sh
+/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-XXXX-XX-XX-x.xctoolchain/usr/bin/swift run -Xswiftc -enable-experimental-feature -Xswiftc BodyMacros
+```
+
+Be aware that you may get weird compiler crashes if you try to run the example with **Xcode**,
+I'm not really sure what's causing it, but I don't think it's the macro's fault. Copying
+and pasting the expanded code and compiling that runs fine.
 
 ### Known limitations
 
