@@ -65,7 +65,7 @@ final class BareLastExprRewriter: SyntaxRewriter {
         }
 
         return ExprSyntax(
-            ImplicitReturn.immediatelyCalledClosure(returning: newExpr)
+            BareLastExprsMacro.immediatelyCalledClosure(returning: newExpr)
         )
     }
 
@@ -74,7 +74,7 @@ final class BareLastExprRewriter: SyntaxRewriter {
         switchExpr.cases = SwitchCaseListSyntax(switchExpr.cases.map { switchCase in
             switch switchCase {
                 case .switchCase(var switchCase):
-                    switchCase.statements = ImplicitReturn.addExplicitReturn(to: CodeBlockSyntax(
+                    switchCase.statements = BareLastExprsMacro.addExplicitReturn(to: CodeBlockSyntax(
                         statements: switchCase.statements
                     )).statements
                     return .switchCase(switchCase)
@@ -88,12 +88,12 @@ final class BareLastExprRewriter: SyntaxRewriter {
 
     static func addExplicitReturns(to ifExpr: IfExprSyntax) -> IfExprSyntax {
         var ifExpr = ifExpr
-        ifExpr.body = ImplicitReturn.addExplicitReturn(to: ifExpr.body)
+        ifExpr.body = BareLastExprsMacro.addExplicitReturn(to: ifExpr.body)
         switch ifExpr.elseBody {
             case .ifExpr(let elseIfExpr):
                 ifExpr.elseBody = .ifExpr(addExplicitReturns(to: elseIfExpr))
             case .codeBlock(let elseBlock):
-                ifExpr.elseBody = .codeBlock(ImplicitReturn.addExplicitReturn(to: elseBlock))
+                ifExpr.elseBody = .codeBlock(BareLastExprsMacro.addExplicitReturn(to: elseBlock))
             case .none:
                 break
         }
@@ -102,14 +102,14 @@ final class BareLastExprRewriter: SyntaxRewriter {
 }
 
 @_spi(ExperimentalLanguageFeature)
-public struct ImplicitReturn: BodyMacro {
+public struct BareLastExprsMacro: BodyMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
         in context: some MacroExpansionContext
     ) throws -> [CodeBlockItemSyntax] {
         guard let function = declaration.as(FunctionDeclSyntax.self) else {
-            throw ExpansionError("ImplicitReturn can only be applied to functions")
+            throw ExpansionError("BareLastExprs can only be applied to functions")
         }
 
         guard var body = declaration.body else {
@@ -186,8 +186,8 @@ public struct ImplicitReturn: BodyMacro {
 }
 
 @main
-struct ImplicitReturnPlugin: CompilerPlugin {
+struct BareLastExprsPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
-        ImplicitReturn.self,
+        BareLastExprsMacro.self,
     ]
 }

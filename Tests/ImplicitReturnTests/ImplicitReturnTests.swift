@@ -3,20 +3,20 @@ import SwiftSyntaxMacrosTestSupport
 import XCTest
 
 // Macro implementations build for the host, so the corresponding module is not available when cross-compiling. Cross-compiled tests may still make use of the macro itself in end-to-end tests.
-#if canImport(ImplicitReturnMacros)
-@_spi(ExperimentalLanguageFeature) import ImplicitReturnMacros
+#if canImport(BareLastExprsMacros)
+@_spi(ExperimentalLanguageFeature) import BareLastExprsMacros
 
 let testMacros: [String: Macro.Type] = [
-    "ImplicitReturn": ImplicitReturn.self,
+    "BareLastExprs": BareLastExprs.self,
 ]
 #endif
 
-final class ImplicitReturnTests: XCTestCase {
+final class BareLastExprsTests: XCTestCase {
     func testSimpleLastExpr() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func add(_ lhs: Int, _ rhs: Int) -> Int {
                 let result = lhs + rhs
                 result
@@ -36,10 +36,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprIf() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
                 let result = lhs + rhs
                 if result > max {
@@ -77,10 +77,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprSwitch() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func fortune(_ number: Int) -> String {
                 print("Requesting fortune for \\(number)")
                 switch number {
@@ -120,10 +120,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprSwitchExprVarDecl() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func fortune(_ number: Int) -> String {
                 print("Requesting fortune for \\(number)")
                 let fortune = switch number {
@@ -165,10 +165,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprSwitchExprAssignment() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func fortune(_ number: Int) -> String {
                 print("Requesting fortune for \\(number)")
                 let fortune: String
@@ -212,10 +212,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprIfExprVarDecl() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
                 let result = lhs + rhs
                 let clampedResult = if result > max {
@@ -255,10 +255,10 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprIfExprAssignment() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func clampedAdd(_ lhs: Int, _ rhs: Int,  min: Int, max: Int) -> Int {
                 let result = lhs + rhs
                 let clampedResult: Int
@@ -300,20 +300,20 @@ final class ImplicitReturnTests: XCTestCase {
     }
 
     func testLastExprVoidFunction() throws {
-        #if canImport(ImplicitReturnMacros)
+        #if canImport(BareLastExprsMacros)
         assertMacroExpansion(
             """
-            @ImplicitReturn
+            @BareLastExprs
             func greet(_ name: String) {
                 print("Greetings, \\(name)!")
             }
 
-            @ImplicitReturn
+            @BareLastExprs
             func greet(_ name: String) -> Void {
                 print("Greetings, \\(name)!")
             }
 
-            @ImplicitReturn
+            @BareLastExprs
             func greet(_ name: String) -> () {
                 print("Greetings, \\(name)!")
             }

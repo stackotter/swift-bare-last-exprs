@@ -1,7 +1,7 @@
-import ImplicitReturn
+import BareLastExprs
 import Foundation
 
-@ImplicitReturn
+@BareLastExprs
 func fortune(_ number: Int) -> String {
     print("Requesting fortune for \(number)")
     let fortune = switch number {
