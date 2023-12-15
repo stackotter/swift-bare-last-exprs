@@ -12,6 +12,95 @@ struct ExpansionError: LocalizedError {
     }
 }
 
+final class BareLastExprRewriter: SyntaxRewriter {
+    override func visit(_ variableDecl: VariableDeclSyntax) -> DeclSyntax {
+        var variableDecl = variableDecl
+        variableDecl.bindings = PatternBindingListSyntax(variableDecl.bindings.map { binding in
+            if var initializer = binding.initializer {
+                initializer.value = Self.updateBareLastExprs(in: initializer.value)
+
+                var binding = binding
+                binding.initializer = initializer
+                return binding
+            } else {
+                return binding
+            }
+        })
+        return DeclSyntax(variableDecl)
+    }
+
+    // Not really sure why SwiftSyntax parses assignment of a switch/if statement to a variable as
+    // SequenceExprSyntax, but it does.
+    override func visit(_ assignmentExpr: SequenceExprSyntax) -> ExprSyntax {
+        let elements = assignmentExpr.elements
+        guard elements.count == 3, elements[elements.index(at: 1)].is(AssignmentExprSyntax.self) else {
+            return ExprSyntax(assignmentExpr)
+        }
+
+        let value = assignmentExpr.elements[elements.index(at: 2)]
+
+        var assignmentExpr = assignmentExpr
+        assignmentExpr.elements[elements.index(at: 2)] = Self.updateBareLastExprs(in: value)
+        return ExprSyntax(assignmentExpr)
+    }
+
+    override func visit(_ returnStmt: ReturnStmtSyntax) -> StmtSyntax {
+        guard let expr = returnStmt.expression else {
+            return StmtSyntax(returnStmt)
+        }
+
+        var returnStmt = returnStmt
+        returnStmt.expression = Self.updateBareLastExprs(in: expr)
+        return StmtSyntax(returnStmt)
+    }
+
+    static func updateBareLastExprs(in expr: ExprSyntax) -> ExprSyntax {
+        let newExpr: ExprSyntax
+        if let ifExpr = expr.as(IfExprSyntax.self) {
+            newExpr = ExprSyntax(Self.addExplicitReturns(to: ifExpr))
+        } else if let switchExpr = expr.as(SwitchExprSyntax.self) {
+            newExpr = ExprSyntax(Self.addExplicitReturns(to: switchExpr))
+        } else {
+            return ExprSyntax(expr)
+        }
+
+        return ExprSyntax(
+            ImplicitReturn.immediatelyCalledClosure(returning: newExpr)
+        )
+    }
+
+    static func addExplicitReturns(to switchExpr: SwitchExprSyntax) -> SwitchExprSyntax {
+        var switchExpr = switchExpr
+        switchExpr.cases = SwitchCaseListSyntax(switchExpr.cases.map { switchCase in
+            switch switchCase {
+                case .switchCase(var switchCase):
+                    switchCase.statements = ImplicitReturn.addExplicitReturn(to: CodeBlockSyntax(
+                        statements: switchCase.statements
+                    )).statements
+                    return .switchCase(switchCase)
+                case .ifConfigDecl:
+                    // TODO
+                    return switchCase
+            }
+        })
+        return switchExpr
+    }
+
+    static func addExplicitReturns(to ifExpr: IfExprSyntax) -> IfExprSyntax {
+        var ifExpr = ifExpr
+        ifExpr.body = ImplicitReturn.addExplicitReturn(to: ifExpr.body)
+        switch ifExpr.elseBody {
+            case .ifExpr(let elseIfExpr):
+                ifExpr.elseBody = .ifExpr(addExplicitReturns(to: elseIfExpr))
+            case .codeBlock(let elseBlock):
+                ifExpr.elseBody = .codeBlock(ImplicitReturn.addExplicitReturn(to: elseBlock))
+            case .none:
+                break
+        }
+        return ifExpr
+    }
+}
+
 @_spi(ExperimentalLanguageFeature)
 public struct ImplicitReturn: BodyMacro {
     public static func expansion(
@@ -19,11 +108,28 @@ public struct ImplicitReturn: BodyMacro {
         providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
         in context: some MacroExpansionContext
     ) throws -> [CodeBlockItemSyntax] {
-        guard let body = declaration.body else {
+        guard let function = declaration.as(FunctionDeclSyntax.self) else {
+            throw ExpansionError("ImplicitReturn can only be applied to functions")
+        }
+
+        guard var body = declaration.body else {
             throw ExpansionError("Missing function body")
         }
 
-        return Array(addExplicitReturns(to: body).statements)
+        // TODO: More rigorous return-type check (i.e. one that knows that `(Void)`
+        //   is equivalent to `Void`).
+        if let returnClause = function.signature.returnClause {
+            var returnType = returnClause.type
+            returnType.leadingTrivia = Trivia(pieces: [])
+            returnType.trailingTrivia = Trivia(pieces: [])
+
+            let isVoid = returnType.description == "Void" || returnType.description == "()"
+            if !isVoid {
+                body = addExplicitReturn(to: body)
+            }
+        }
+
+        return Array(BareLastExprRewriter().visit(body).statements)
     }
 
     static func codeBlockItem(returning expr: ExprSyntax) -> CodeBlockItemSyntax {
@@ -34,7 +140,7 @@ public struct ImplicitReturn: BodyMacro {
         return "return \(expr)"
     }
 
-    static func addExplicitReturns(to codeBlock: CodeBlockSyntax) -> CodeBlockSyntax {
+    static func addExplicitReturn(to codeBlock: CodeBlockSyntax) -> CodeBlockSyntax {
         var items: [CodeBlockItemSyntax] = Array(codeBlock.statements)
 
         if let lastStatement = items.last {
@@ -43,14 +149,8 @@ public struct ImplicitReturn: BodyMacro {
                     codeBlockItem(returning: expr)
                 case .stmt(let stmt):
                     if let exprStmt = stmt.as(ExpressionStmtSyntax.self) {
-                        if let ifExpr = exprStmt.expression.as(IfExprSyntax.self) {
-                            CodeBlockItemSyntax(item: .expr(ExprSyntax(
-                                addExplicitReturns(to: ifExpr)
-                            )))
-                        } else if let switchExpr = exprStmt.expression.as(SwitchExprSyntax.self) {
-                            CodeBlockItemSyntax(item: .expr(ExprSyntax(
-                                addExplicitReturns(to: switchExpr)
-                            )))
+                        if exprStmt.expression.is(IfExprSyntax.self) || exprStmt.expression.is(SwitchExprSyntax.self) {
+                            codeBlockItem(returning: exprStmt.expression)
                         } else {
                             lastStatement
                         }
@@ -73,35 +173,15 @@ public struct ImplicitReturn: BodyMacro {
         return CodeBlockSyntax(statements: CodeBlockItemListSyntax(items))
     }
 
-    static func addExplicitReturns(to switchExpr: SwitchExprSyntax) -> SwitchExprSyntax {
-        var switchExpr = switchExpr
-        switchExpr.cases = SwitchCaseListSyntax(switchExpr.cases.map { switchCase in
-            switch switchCase {
-                case .switchCase(var switchCase):
-                    switchCase.statements = addExplicitReturns(to: CodeBlockSyntax(statements: CodeBlockItemListSyntax(
-                        switchCase.statements
-                    ))).statements
-                    return .switchCase(switchCase)
-                case .ifConfigDecl:
-                    // TODO
-                    return switchCase
-            }
-        })
-        return switchExpr
-    }
-
-    static func addExplicitReturns(to ifExpr: IfExprSyntax) -> IfExprSyntax {
-        var ifExpr = ifExpr
-        ifExpr.body = addExplicitReturns(to: ifExpr.body)
-        switch ifExpr.elseBody {
-            case .ifExpr(let elseIfExpr):
-                ifExpr.elseBody = .ifExpr(addExplicitReturns(to: elseIfExpr))
-            case .codeBlock(let elseBlock):
-                ifExpr.elseBody = .codeBlock(addExplicitReturns(to: elseBlock))
-            case .none:
-                break
-        }
-        return ifExpr
+    static func immediatelyCalledClosure(returning expr: ExprSyntax) -> FunctionCallExprSyntax {
+        FunctionCallExprSyntax(
+            calledExpression: ClosureExprSyntax(statements: [
+                CodeBlockItemSyntax(item: .stmt(StmtSyntax(ExpressionStmtSyntax(expression: expr))))
+            ]),
+            leftParen: .leftParenToken(),
+            arguments: [],
+            rightParen: .rightParenToken()
+        )
     }
 }
 
